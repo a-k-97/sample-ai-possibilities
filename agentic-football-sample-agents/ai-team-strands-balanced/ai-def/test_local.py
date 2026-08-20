@@ -5,14 +5,10 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from test_helpers import mock_agentcore_memory, GAME_STATE, TEAM_ID
-os.environ.setdefault("MEMORY_ID", "test-memory-id")
-os.environ.setdefault("MEMORY_TEAM_MEMORY_ID", "test-memory-id")
-os.environ.setdefault("TEAM_ID", str(TEAM_ID))
-mock_agentcore_memory()
+from test_helpers import mock_agentcore, GAME_STATE, TEAM_ID
+mock_agentcore()
 
 from state import summarize_state
 from parsing import parse_commands

@@ -7,12 +7,6 @@ Usage:
 
 Works on macOS, Linux, and Windows (PowerShell) without WSL.
 
-The AgentCore Memory resource is declared in agentcore/agentcore.json
-("team_memory") and is created by `agentcore deploy` along with the agents.
-The CDK stack grants each runtime access and injects the resource ID as the
-MEMORY_TEAM_MEMORY_ID environment variable — no create-memory step and no
-MEMORY_ID export are needed.
-
 Prerequisites:
     npm install -g @aws/agentcore aws-cdk
     uv (https://docs.astral.sh/uv/getting-started/installation/)
@@ -35,10 +29,6 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 LIB_SRC = SCRIPT_DIR.parent / "lib"
-# CDK-flow variant of the memory base module, staged into each agent dir
-# under the name src/main.py imports (memory_agent_base).
-MEMORY_BASE_SRC = SCRIPT_DIR / "memory_agent_base_cdk.py"
-MEMORY_BASE_NAME = "memory_agent_base.py"
 ALL_AGENTS = ["ai-gk", "ai-def", "ai-mid", "ai-fwd1", "ai-fwd2"]
 agents = ALL_AGENTS
 
@@ -60,9 +50,6 @@ def cleanup():
         lib_copy = agent_dir / "lib"
         if lib_copy.exists():
             rmtree(lib_copy)
-        base_copy = agent_dir / MEMORY_BASE_NAME
-        if base_copy.exists():
-            base_copy.unlink()
     if _injected:
         print("\nCleaned up injected files from agent directories.")
 
@@ -146,7 +133,7 @@ def aws_cli(*args):
 # ── Pre-flight ────────────────────────────────────────────────────────────────
 
 print("==========================================")
-print("  AI Team — Deploy Agents (with Memory)")
+print("  AI Team — Deploy Agents")
 print("==========================================\n")
 print("Checking prerequisites...")
 
@@ -218,7 +205,6 @@ try:
             lib_dest,
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
         )
-        shutil.copy2(MEMORY_BASE_SRC, agent_dir / MEMORY_BASE_NAME)
 
         _injected.append(agent_dir)
         print(f"  Ready: {agent_dir}")
@@ -257,6 +243,5 @@ print("==========================================")
 print(f"  Agents:   {', '.join(agents)}")
 print(f"  Account:  {account_id}")
 print(f"  Region:   {region}")
-print("  Memory:   team_memory (created by the stack; ID injected as MEMORY_TEAM_MEMORY_ID)")
 print()
 print("All agents deployed successfully.")

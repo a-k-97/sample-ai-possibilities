@@ -1,16 +1,13 @@
 """
 AI Soccer Defender Agent — Controls ONLY player 1 (Defender).
-Uses Strands SDK + Amazon Nova Lite + AgentCore Memory for cross-tick recall.
+Uses Strands SDK + Amazon Nova Lite.
 """
 
 import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib")); sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
 from _bootstrap import setup_lib_path; setup_lib_path(__file__)
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from memory_agent_base import create_memory_agent
-from agent_base import create_invoke_handler
+from agent_base import create_agent, create_invoke_handler
 from fallback import build_fallback, DEF_CONFIG
 
 app = BedrockAgentCoreApp()
@@ -22,11 +19,6 @@ POSITION_LABEL = "DEF"
 # --- System Prompt ---
 
 SYSTEM_PROMPT = f"""You are an AI soccer defender controlling ONLY player {MY_PLAYER_ID} (the Defender) in a 5v5 match. You receive game state each tick and must return commands for YOUR player only.
-
-You have MEMORY of previous ticks. Use recalled history to:
-- Remember which opponent forwards made dangerous runs and mark them tighter
-- Recall patterns of opponent attacks (e.g. always attacking down the left)
-- Adjust defensive positioning based on what worked or failed earlier
 
 ## Your Role — Defender
 - Stay between the ball and your goal to shield the goalkeeper
@@ -76,7 +68,7 @@ fallback_commands = build_fallback(DEF_CONFIG)
 
 # --- Wire it up ---
 
-agent = create_memory_agent(SYSTEM_PROMPT, MY_PLAYER_ID, POSITION_LABEL, model_id="us.amazon.nova-lite-v1:0")
+agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-lite-v1:0")
 create_invoke_handler(
     app, agent, MY_PLAYER_ID, POSITION_LABEL, fallback_commands,
     fallback_cfg=DEF_CONFIG,

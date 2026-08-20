@@ -69,6 +69,10 @@ def mock_agentcore_memory():
 
     strands_mod.AgentCoreMemorySessionManager = _FakeAgentCoreMemorySessionManager
     config_mod.AgentCoreMemoryConfig = _FakeAgentCoreMemoryConfig
+    # `from ...strands.session_manager import AgentCoreMemorySessionManager`
+    # resolves the attribute on the session_manager module itself, so it must
+    # be set there (the parent-package attribute above is not enough).
+    session_mod.AgentCoreMemorySessionManager = _FakeAgentCoreMemorySessionManager
 
     sys.modules["bedrock_agentcore.memory"] = mem_mod
     sys.modules["bedrock_agentcore.memory.integrations"] = integ_mod

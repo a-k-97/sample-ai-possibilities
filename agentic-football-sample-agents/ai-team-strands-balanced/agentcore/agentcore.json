@@ -1,4 +1,4 @@
-{
+a{
   "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
   "name": "TeamStrandsBalanced",
   "version": 1,
@@ -54,12 +54,7 @@
       "protocol": "HTTP"
     }
   ],
-  "memories": [
-    {
-      "name": "team_memory",
-      "eventExpiryDuration": 7
-    }
-  ],
+  "memories": [],
   "knowledgeBases": [],
   "credentials": [],
   "evaluators": [],
