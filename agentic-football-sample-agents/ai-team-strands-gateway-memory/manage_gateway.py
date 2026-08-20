@@ -27,6 +27,21 @@ ROLE_ARN = os.environ["GATEWAY_ROLE_ARN"]
 ACCOUNT_ID = os.environ["AWS_ACCOUNT_ID"]
 LAMBDA_PREFIX = os.environ.get("LAMBDA_PREFIX", "afwc-gateway-tool")
 
+# Reusable schema fragments — the schemas MUST match what the Lambda handlers
+# in gateway_tools/ actually read from the event body (passer_position,
+# teammates, opponents, ...), NOT a raw game_state blob. The agent builds
+# these small inputs from the positions in its state summary.
+_XY = {
+    "type": "object",
+    "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+    "required": ["x", "y"],
+}
+_TEAM_SIDE = {
+    "type": "string",
+    "enum": ["HOME", "AWAY"],
+    "description": "Your team side: HOME if your goal is at x=-55, AWAY if your goal is at x=+55",
+}
+
 TOOLS = [
     {
         "name": "calculate-pass-options",
@@ -35,15 +50,34 @@ TOOLS = [
         "schema": [
             {
                 "name": "calculate_pass_options",
-                "description": "Calculate pass success probability for each teammate",
+                "description": "Calculate pass success probability for each teammate based on distance and interception risk",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "game_state": {"type": "object", "description": "Current game state"},
-                        "team_id": {"type": "integer", "description": "Team ID (0 or 1)"},
-                        "player_id": {"type": "integer", "description": "Player ID (0-4)"},
+                        "passer_position": {**_XY, "description": "Your current position"},
+                        "teammates": {
+                            "type": "array",
+                            "description": "Your teammates from the Teammates list (id and position)",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "player_id": {"type": "integer"},
+                                    "position": _XY,
+                                },
+                                "required": ["player_id", "position"],
+                            },
+                        },
+                        "opponents": {
+                            "type": "array",
+                            "description": "Opponent players from the Opponents list",
+                            "items": {
+                                "type": "object",
+                                "properties": {"position": _XY},
+                                "required": ["position"],
+                            },
+                        },
                     },
-                    "required": ["game_state", "team_id", "player_id"],
+                    "required": ["passer_position", "teammates", "opponents"],
                 },
             }
         ],
@@ -55,15 +89,20 @@ TOOLS = [
         "schema": [
             {
                 "name": "evaluate_shot",
-                "description": "Evaluate shot success probability and recommend aim point",
+                "description": "Evaluate shot success probability and recommend aim point and power",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "game_state": {"type": "object", "description": "Current game state"},
-                        "team_id": {"type": "integer", "description": "Team ID (0 or 1)"},
-                        "player_id": {"type": "integer", "description": "Player ID (0-4)"},
+                        "shooter_position": {**_XY, "description": "Your current position"},
+                        "goalkeeper_position": {**_XY, "description": "The OPPONENT goalkeeper's position (usually OPP0)"},
+                        "team_side": _TEAM_SIDE,
+                        "blocker_positions": {
+                            "type": "array",
+                            "description": "Positions of opponents between you and the goal (optional)",
+                            "items": _XY,
+                        },
                     },
-                    "required": ["game_state", "team_id", "player_id"],
+                    "required": ["shooter_position", "goalkeeper_position", "team_side"],
                 },
             }
         ],
@@ -79,11 +118,20 @@ TOOLS = [
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "game_state": {"type": "object", "description": "Current game state"},
-                        "team_id": {"type": "integer", "description": "Team ID (0 or 1)"},
-                        "zone": {"type": "string", "description": "Zone: attack, midfield, or defense"},
+                        "opponent_positions": {
+                            "type": "array",
+                            "description": "Positions of all opponent players from the Opponents list",
+                            "items": _XY,
+                        },
+                        "zone": {
+                            "type": "string",
+                            "enum": ["attack", "midfield", "defense"],
+                            "description": "Zone to find space in, relative to your team's attacking direction",
+                        },
+                        "team_side": _TEAM_SIDE,
+                        "my_position": {**_XY, "description": "Your current position"},
                     },
-                    "required": ["game_state", "team_id"],
+                    "required": ["opponent_positions", "zone", "team_side", "my_position"],
                 },
             }
         ],
@@ -95,15 +143,36 @@ TOOLS = [
         "schema": [
             {
                 "name": "get_defensive_assignment",
-                "description": "Rank opponent threats for defensive marking priority",
+                "description": "Rank opponent threats and recommend who to MARK and how tightly",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "game_state": {"type": "object", "description": "Current game state"},
-                        "team_id": {"type": "integer", "description": "Team ID (0 or 1)"},
-                        "player_id": {"type": "integer", "description": "Player ID (0-4)"},
+                        "opponents": {
+                            "type": "array",
+                            "description": "Opponent players from the Opponents list (id and position)",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "player_id": {"type": "integer"},
+                                    "position": _XY,
+                                },
+                                "required": ["player_id", "position"],
+                            },
+                        },
+                        "ball": {
+                            "type": "object",
+                            "description": "Ball position, plus possession_player_id if an opponent holds it",
+                            "properties": {
+                                "x": {"type": "number"},
+                                "y": {"type": "number"},
+                                "possession_player_id": {"type": "integer"},
+                            },
+                            "required": ["x", "y"],
+                        },
+                        "my_position": {**_XY, "description": "Your current position"},
+                        "team_side": _TEAM_SIDE,
                     },
-                    "required": ["game_state", "team_id", "player_id"],
+                    "required": ["opponents", "ball", "my_position", "team_side"],
                 },
             }
         ],

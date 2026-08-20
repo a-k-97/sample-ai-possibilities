@@ -50,7 +50,7 @@ agents/
 └── ai-team-strands-gateway-memory/
     ├── ai-gk/                           # Goalkeeper  (player 0) — Nova Micro + Gateway + Memory
     ├── ai-def/                          # Defender    (player 1) — Nova Lite  + Gateway + Memory
-    ├── ai-mid/                          # Midfielder  (player 2) — Nova Pro   + Gateway + Memory
+    ├── ai-mid/                          # Midfielder  (player 2) — Nova Lite  + Gateway + Memory (Lite, not Pro — see Latency budget)
     ├── ai-fwd1/                         # Forward 1   (player 3) — Nova Micro + Gateway + Memory
     ├── ai-fwd2/                         # Forward 2   (player 4) — Nova Lite  + Gateway + Memory
     ├── agentcore/                       # AgentCore project config (agents + gateway + tools + memory)
@@ -76,6 +76,49 @@ and what to recall from earlier ticks, but the agent decides autonomously:
 | MID | `calculate_pass_options`, `find_open_space`, `evaluate_shot` | Working passing lanes, pressing patterns |
 | FWD1 | `evaluate_shot`, `calculate_pass_options`, `find_open_space` | Scoring positions, goalkeeper tendencies |
 | FWD2 | `evaluate_shot`, `calculate_pass_options`, `find_open_space` | Combination plays, defender positioning |
+
+## Performance Tuning (Phase 3 lessons baked in)
+
+This team applies the workshop's Phase 3 guidance (System Prompt Engineering,
+Multi-Agent Coordination, Observability) directly:
+
+**System prompts follow the four-layer template.** Every agent's prompt has
+an identity line, a numbered decision hierarchy, situational rules
+(winning / losing / low stamina), and hard NEVER constraints — instead of a
+loose list of suggestions.
+
+**Pass targets are unambiguous.** Both teams number their players 0-4, which
+is how goalkeepers end up "passing" to opponents. The state summary labels
+opponents `OPP{n}` and marks the Teammates list as the only valid pass
+targets, and every prompt enforces: PASS / GK_DISTRIBUTE targets come from
+the Teammates list; OPP ids are only for MARK / PRESS / SLIDE_TACKLE.
+
+**Direction is goal-relative.** Prompts never assume "HOME defends -x".
+Agents read "Your goal at x=… / Opponent goal at x=…" from the state summary,
+so the team plays correctly on either side of the pitch.
+
+**Stamina is visible and budgeted.** The game server reports stamina as a
+0-1 fraction; the summary now renders it as a percentage (a raw `.0f` format
+collapsed every value to 0 or 1, so agents literally could not see fatigue).
+Prompts add uniform discipline: sprint freely above 50%, only for clear
+chances at 30-50%, never below 30% — and positions that don't need to run
+(GK, holding DEF) are told not to. This keeps stamina even across the team.
+
+**Latency budget: at most one tool call per tick.** Per the observability
+docs, a gateway agent's tick costs ~2s and the match server drops responses
+that arrive too late — a "stuck" player is usually a timed-out player. Every
+prompt restricts agents to one MCP tool call per tick, only when the result
+would change the decision, and the midfielder runs Nova Lite instead of Nova
+Pro because this variant already stacks memory recall + tool calls on every
+tick.
+
+**Tool schemas match the Lambda handlers.** The tool `inputSchema`s in
+`agentcore.json` (and `manage_gateway.py` for the legacy flow) describe the
+inputs the Lambdas in `gateway_tools/` actually read — small position
+payloads like `passer_position` / `teammates` / `opponents` that the agent
+builds from its state summary. (Schemas advertising a raw `game_state` blob
+made every tool call fail inside the Lambda with a KeyError, so agents burned
+their tick budget on broken calls.)
 
 ## Prerequisites
 
