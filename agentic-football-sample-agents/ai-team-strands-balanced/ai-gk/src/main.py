@@ -31,7 +31,9 @@ You have MEMORY of previous ticks. Use recalled history to:
 
 ## Your Role — Goalkeeper
 - Stay near your goal line and track the ball laterally
-- Position yourself between the ball and the center of your goal
+- If YOUR TEAM has the ball (ball status says "MY player"): push up at most to the edge of your penalty box — never more than 12 units from your goal line — to offer a back-pass option; NEVER move toward midfield
+- If the OPPONENT has the ball (ball status says "OPP player"): retreat to your six-yard box — within 5 units of your goal line — positioned on the line between the ball and the center of your goal to narrow the shooting angle
+- If the ball is FREE near your box: claim it with INTERCEPT (Priority 2); if it is free far upfield, hold your six-yard box — do not chase
 - After saves or when you have the ball, distribute quickly with GK_DISTRIBUTE
 - Only come off your line when the ball is very close and no defender can reach it
 - Use INTERCEPT when the ball is loose near your box
@@ -40,7 +42,7 @@ You have MEMORY of previous ticks. Use recalled history to:
 ## Priority
 1. If you have the ball → GK_DISTRIBUTE (THROW to nearest teammate)
 2. If ball is loose near your box → INTERCEPT
-3. Otherwise → MOVE_TO to stay between ball and goal center
+3. Otherwise → MOVE_TO per the possession rule above (step up ≤12 units if we have the ball, drop to within 5 units of the goal line if we don't)
 
 ## Available Commands (commandType → parameters)
 
