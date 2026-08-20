@@ -3,7 +3,6 @@
 Five AI agents that each control a single player in a 5v5 soccer match, built with
 [Strands Agents SDK](https://github.com/strands-agents/sdk-python) and deployed to
 [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/).
-Each agent uses AgentCore Memory (STM) so it can recall earlier ticks in the match.
 
 ## Architecture
 
@@ -11,13 +10,11 @@ Each agent uses AgentCore Memory (STM) so it can recall earlier ticks in the mat
 agents/
 ├── lib/            # Shared library (single source of truth, used by all teams)
 └── ai-team-strands-balanced/
-    ├── ai-gk/          # Goalkeeper  (player 0) — Nova Micro + Memory
-    ├── ai-def/         # Defender    (player 1) — Nova Lite  + Memory
-    ├── ai-mid/         # Midfielder  (player 2) — Nova Pro   + Memory
-    ├── ai-fwd1/        # Forward 1   (player 3) — Nova Micro + Memory
-    ├── ai-fwd2/        # Forward 2   (player 4) — Nova Lite  + Memory
-    ├── agentcore/      # AgentCore project config (agents + team_memory)
-    ├── memory_agent_base_cdk.py  # Memory-aware agent factory (CDK deploy)
+    ├── ai-gk/          # Goalkeeper  (player 0) — Nova Micro
+    ├── ai-def/         # Defender    (player 1) — Nova Lite
+    ├── ai-mid/         # Midfielder  (player 2) — Nova Pro
+    ├── ai-fwd1/        # Forward 1   (player 3) — Nova Micro
+    ├── ai-fwd2/        # Forward 2   (player 4) — Nova Lite
     ├── deploy_all.py   # Build + deploy script
     └── README.md
 ```
@@ -38,15 +35,10 @@ Every agent's `main.py` follows the same pattern:
 
 1. **System prompt** — tells the LLM what position it plays and what commands are available
 2. **Fallback config** — rule-based behavior when the LLM fails to respond properly
-3. **Wire it up** — `create_memory_agent()` + `create_invoke_handler()`
-
-A `team_memory` resource is declared in `agentcore/agentcore.json`. `agentcore deploy`
-creates it, grants every runtime access, and injects `MEMORY_TEAM_MEMORY_ID`.
-`deploy_all.py` stages `memory_agent_base_cdk.py` into each agent as
-`memory_agent_base.py`.
+3. **Wire it up** — `create_agent()` + `create_invoke_handler()` from the shared lib
 
 The shared `lib/` provides:
-- `agent_base.py` — invoke handler with 3-layer error handling (LLM → fallback → last-resort)
+- `agent_base.py` — agent factory + invoke handler with 3-layer error handling (LLM → fallback → last-resort)
 - `fallback.py` — configurable rule-based fallback per position
 - `parsing.py` — extracts JSON commands from LLM responses
 - `state.py` — summarizes game state into text for the LLM
@@ -93,12 +85,11 @@ python deploy_all.py
 
 The deploy script:
 1. Runs `cdk bootstrap` (idempotent — safe to run every time)
-2. Temporarily copies the shared `lib/` directory and `memory_agent_base_cdk.py` into each agent's source directory
-3. Runs `agentcore deploy` once to deploy all agents plus `team_memory` via CDK
-4. Removes the injected copies on success, failure, or Ctrl+C
+2. Temporarily copies the shared `lib/` directory into each agent's source directory
+3. Runs `agentcore deploy` once to deploy all agents via CDK
+4. Removes the injected `lib/` copies on success, failure, or Ctrl+C
 
 The shared `lib/` remains a single source of truth — the copies are temporary and never committed.
-The memory ID is injected as `MEMORY_TEAM_MEMORY_ID`; nothing to export.
 
 
 ## Creating Your Own Agent
@@ -124,8 +115,8 @@ SYSTEM_PROMPT = f"""You are an AI soccer goalkeeper..."""
 # 3. Pick a fallback config (or create your own in lib/fallback.py)
 fallback_commands = build_fallback(GK_CONFIG)
 
-# 4. Choose your model (memory session is wired automatically)
-agent = create_memory_agent(SYSTEM_PROMPT, MY_PLAYER_ID, POSITION_LABEL, model_id="us.amazon.nova-micro-v1:0")
+# 4. Choose your model
+agent = create_agent(SYSTEM_PROMPT, model_id="us.amazon.nova-micro-v1:0")
 ```
 
 ### `agentcore/agentcore.json`

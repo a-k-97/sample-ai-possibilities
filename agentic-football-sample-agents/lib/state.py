@@ -65,6 +65,17 @@ def dist(pos1: dict, pos2: dict) -> float:
     )
 
 
+def _stamina_pct(player: dict) -> float:
+    """Stamina as a 0-100 percentage.
+
+    The game server sends stamina as a 0-1 fraction; older formats used 0-100.
+    Rendering the fraction with :.0f collapsed every value to 0 or 1, which
+    made stamina invisible to the LLM — treat values <= 1.0 as fractions.
+    """
+    stam = player.get("stamina", 1.0)
+    return stam * 100 if stam <= 1.0 else stam
+
+
 def summarize_state(
     game_state: dict,
     team_id: int,
@@ -104,19 +115,19 @@ def summarize_state(
     # My player info
     if me:
         pos = me.get("position", {})
-        stam = me.get("stamina", 100)
+        stam = _stamina_pct(me)
         dist_ball = dist(pos, ball_pos)
         has_ball = possession_id == my_player_id
         extra = f" distOppGoal={abs(pos.get('x', 0) - opp_goal_x):.1f}" if position_label in ("MID", "FWD1", "FWD2") else ""
         lines.append(
             f">>> YOUR PLAYER ({position_label}, id={my_player_id}): "
             f"pos=({pos.get('x',0):.1f},{pos.get('y',0):.1f}) "
-            f"stam={stam:.0f} distBall={dist_ball:.1f}{extra} hasBall={has_ball}"
+            f"stam={stam:.0f}% distBall={dist_ball:.1f}{extra} hasBall={has_ball}"
         )
     lines.append("")
 
-    # Teammates
-    lines.append("Teammates:")
+    # Teammates — these ids are the ONLY valid PASS / GK_DISTRIBUTE targets
+    lines.append("Teammates (valid pass targets):")
     for p in my_team:
         if _player_idx(p) == my_player_id:
             continue
@@ -130,14 +141,15 @@ def summarize_state(
 
     lines.append("")
 
-    # Opponents
-    opp_header = "Opponents (defenders to watch):" if position_label in ("FWD1", "FWD2") else "Opponents:"
+    # Opponents — labeled OPP so the LLM never confuses them with teammates,
+    # since both teams number their players 0-4.
+    opp_header = "Opponents (NOT pass targets — defenders to watch):" if position_label in ("FWD1", "FWD2") else "Opponents (NOT pass targets):"
     lines.append(opp_header)
     for p in opponents:
         pos = p.get("position", {})
         pid = _player_idx(p)
         d_goal = abs(pos.get("x", 0) - my_goal_x)
         d_me = dist(pos, me.get("position", {})) if me else 0
-        lines.append(f"  P{pid}: ({pos.get('x',0):.1f},{pos.get('y',0):.1f}) distToMyGoal={d_goal:.1f} distToMe={d_me:.1f}")
+        lines.append(f"  OPP{pid}: ({pos.get('x',0):.1f},{pos.get('y',0):.1f}) distToMyGoal={d_goal:.1f} distToMe={d_me:.1f}")
 
     return "\n".join(lines)
